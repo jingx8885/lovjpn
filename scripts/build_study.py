@@ -161,7 +161,7 @@ def build_kana_origin_panel() -> str:
         rows.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
     return (
         '<details class="kana-origin">'
-        '<summary>📖 五十音字源（平假名 · 汉字草书 · 中古拟音 · 古中日演变）</summary>'
+        '<summary>📖 五十音字源（平假名+片假名 · 汉字草书/偏旁 · 中古拟音 · 古中日演变）</summary>'
         f'<table class="ko-table">{thead}{"".join(rows)}</table>'
         '</details>'
     )
