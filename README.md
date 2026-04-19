@@ -42,18 +42,36 @@
 
 ## 安装 & 使用
 
-### 作为 Claude Code skill
-
-把这个仓库 clone 到 `~/.claude/skills/` 或者你的 plugin 目录：
+### 一键安装（推荐，走 [skills.sh](https://skills.sh) 生态）
 
 ```bash
-git clone https://github.com/<you>/lovjpn.git ~/.claude/skills/japanese-deep-translate
+# 装到当前项目（./claude-code/skills/japanese-deep-translate/）
+npx skills add jingx8885/lovjpn
+
+# 或装到全局（~/.claude/skills/japanese-deep-translate/）
+npx skills add jingx8885/lovjpn -g
+```
+
+支持 Claude Code / Cursor / Codex / OpenCode 等 40+ agent，会自动放到对应目录。装完在 skill 目录下建虚拟环境：
+
+```bash
+cd <装好的目录>
+python3 -m venv .venv
+.venv/bin/pip install edge-tts yt-dlp
+```
+
+### 手动 clone（不想走 CLI 的话）
+
+```bash
+git clone https://github.com/jingx8885/lovjpn.git ~/.claude/skills/japanese-deep-translate
 cd ~/.claude/skills/japanese-deep-translate
 python3 -m venv .venv
 .venv/bin/pip install edge-tts yt-dlp
 ```
 
-之后在 Claude Code 里直接说：
+### 装好之后
+
+在 Claude Code 里直接说：
 
 - "拆解 YOASOBI 的 群青"
 - "帮我学 林原めぐみ 的 Give a reason"
