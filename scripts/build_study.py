@@ -173,6 +173,38 @@ def build_html(data: dict) -> str:
     audio_file = audio.get("file")
     audio_source = audio.get("source", "none")
     has_original = bool(audio_file) and audio_source != "none"
+    playback = data.get("playback") or {}
+    raw_presets = playback.get("speed_presets", [1.0, 0.85, 0.7])
+    presets = []
+    for x in raw_presets if isinstance(raw_presets, list) else []:
+        try:
+            r = float(x)
+        except (TypeError, ValueError):
+            continue
+        if 0.5 <= r <= 1.5 and r not in presets:
+            presets.append(r)
+    if not presets:
+        presets = [1.0, 0.85, 0.7]
+    try:
+        default_rate = float(playback.get("default_speed", 1.0))
+    except (TypeError, ValueError):
+        default_rate = 1.0
+    if default_rate not in presets:
+        default_rate = min(presets, key=lambda r: abs(r - default_rate))
+
+    def _speed_label(rate: float) -> str:
+        return f"{rate:.1f}x" if abs(rate - round(rate)) < 1e-8 else f"{rate:g}x"
+
+    speed_controls = (
+        '<div class="speed-controls" aria-label="播放速度">'
+        '<span class="speed-label">速度</span>'
+        + "".join(
+            f'<button type="button" class="btn-speed" data-rate="{r:g}">{_speed_label(r)}</button>'
+            for r in presets
+        )
+        + '</div>'
+    )
+    speed_storage_key = f"lovjpn:playback-rate:{data.get('title','')}::{audio_file or 'no-audio'}"
 
     if has_original:
         source_label = {
@@ -185,6 +217,7 @@ def build_html(data: dict) -> str:
             f'<div class="main-player">'
             f'<audio id="main-audio" src="{esc(audio_file)}" controls preload="metadata"></audio>'
             f'<span class="source-tag">原曲来源：{esc(source_label)}</span>'
+            f'{speed_controls}'
             f"</div>"
         )
     else:
@@ -239,6 +272,22 @@ def build_html(data: dict) -> str:
   h1 {{ margin: 0 0 .4em; color: var(--accent-dark); font-size: 1.4em; }}
   .main-player {{ display: flex; align-items: center; gap: .8em; flex-wrap: wrap; }}
   .main-player audio {{ flex: 1; min-width: 280px; max-width: 100%; }}
+  .speed-controls {{
+    display: inline-flex; align-items: center; gap: .4em; flex-wrap: wrap;
+    margin-left: auto;
+  }}
+  .speed-label {{
+    font-size: .82em; color: #666;
+    background: #eef4ef; padding: .18em .55em; border-radius: 10px;
+  }}
+  .btn-speed {{
+    border: 1px solid #c9d9cc; background: #fff; color: #2b5a43;
+    border-radius: 14px; padding: .2em .7em; cursor: pointer;
+    font-size: .86em; line-height: 1.2;
+  }}
+  .btn-speed.active {{
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }}
   .source-tag {{
     font-size: .82em; color: #666; background: #eef4ef;
     padding: .2em .6em; border-radius: 10px;
@@ -353,12 +402,50 @@ def build_html(data: dict) -> str:
 <script>
 (function() {{
   const mainAudio = document.getElementById('main-audio');
+  const speedButtons = Array.from(document.querySelectorAll('.btn-speed'));
+  const ttsAudios = Array.from(document.querySelectorAll('audio[id^="tts-"]'));
+  const speedPresets = {json.dumps(presets)};
+  const defaultRate = {default_rate};
+  const speedStorageKey = {json.dumps(speed_storage_key)};
   const kanaDetails = document.querySelector('details.kana-origin');
   const sentences = Array.from(document.querySelectorAll('section.sentence[data-ms]'));
   const timedSentences = sentences
     .map(s => ({{el: s, ms: parseInt(s.dataset.ms, 10)}}))
     .filter(x => !isNaN(x.ms))
     .sort((a, b) => a.ms - b.ms);
+
+  function normalizeRate(x) {{
+    const v = Number(x);
+    if (!Number.isFinite(v)) return defaultRate;
+    return speedPresets.includes(v) ? v : defaultRate;
+  }}
+
+  function applyRate(rate, persist = true) {{
+    const next = normalizeRate(rate);
+    if (mainAudio) mainAudio.playbackRate = next;
+    ttsAudios.forEach(a => {{ a.playbackRate = next; }});
+    speedButtons.forEach(btn => {{
+      const r = Number(btn.dataset.rate || defaultRate);
+      btn.classList.toggle('active', Math.abs(r - next) < 1e-8);
+    }});
+    if (persist) {{
+      try {{ localStorage.setItem(speedStorageKey, String(next)); }} catch (e) {{}}
+    }}
+    return next;
+  }}
+
+  let currentRate = defaultRate;
+  try {{
+    const stored = localStorage.getItem(speedStorageKey);
+    if (stored !== null) currentRate = normalizeRate(stored);
+  }} catch (e) {{}}
+  currentRate = applyRate(currentRate, false);
+
+  speedButtons.forEach(btn => {{
+    btn.addEventListener('click', () => {{
+      currentRate = applyRate(btn.dataset.rate, true);
+    }});
+  }});
 
   function syncKanaOpenState() {{
     document.body.classList.toggle('kana-open', !!(kanaDetails && kanaDetails.open));
@@ -465,6 +552,7 @@ def build_html(data: dict) -> str:
       if (mainAudio && !mainAudio.paused) mainAudio.pause();
       const audio = document.getElementById('tts-' + btn.dataset.id);
       if (!audio) return;
+      audio.playbackRate = currentRate;
       btn.classList.add('playing');
       audio.play();
       audio.onended = () => btn.classList.remove('playing');
