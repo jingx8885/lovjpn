@@ -312,6 +312,19 @@ def build_html(data: dict) -> str:
     background: #eef4ef; border-radius: 6px;
     font-size: .9em;
   }}
+  body.kana-open header.top {{
+    position: static;
+  }}
+  details.kana-origin[open] {{
+    max-height: 62vh;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }}
+  details.kana-origin[open] .ko-table {{
+    display: block;
+    max-height: calc(62vh - 2.2em);
+    overflow: auto;
+  }}
   details.kana-origin summary {{
     cursor: pointer; font-weight: 600; color: var(--accent-dark);
     padding: .2em 0;
@@ -340,11 +353,20 @@ def build_html(data: dict) -> str:
 <script>
 (function() {{
   const mainAudio = document.getElementById('main-audio');
+  const kanaDetails = document.querySelector('details.kana-origin');
   const sentences = Array.from(document.querySelectorAll('section.sentence[data-ms]'));
   const timedSentences = sentences
     .map(s => ({{el: s, ms: parseInt(s.dataset.ms, 10)}}))
     .filter(x => !isNaN(x.ms))
     .sort((a, b) => a.ms - b.ms);
+
+  function syncKanaOpenState() {{
+    document.body.classList.toggle('kana-open', !!(kanaDetails && kanaDetails.open));
+  }}
+  if (kanaDetails) {{
+    kanaDetails.addEventListener('toggle', syncKanaOpenState);
+    syncKanaOpenState();
+  }}
 
   function setActive(el) {{
     document.querySelectorAll('section.sentence.active').forEach(s => {{
@@ -395,6 +417,7 @@ def build_html(data: dict) -> str:
       }}
       setActive(active);
       if (active && !mainAudio.paused
+          && !document.body.classList.contains('kana-open')
           && Date.now() - userScrolledRecently > 2500
           && !isInViewport(active)) {{
         active.scrollIntoView({{behavior: 'smooth', block: 'center'}});
